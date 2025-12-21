@@ -7,8 +7,10 @@ from constants import Constants as const
 
 
 def train_sub_step_test_step_er(config):
+    # NOTE: This function is *optional*, but we keep it for future experiments.
+    # For now you don't need to use it for the LSTM baseline.
     train_loader, val_loader, test_loader = train_sub_step_test_step_dataset_base(config)
-    train_model_base(train_loader, val_loader, config)
+    train_model_base(train_loader, val_loader, config, test_loader=test_loader)
 
 
 def train_step_test_step_er(config):
@@ -19,6 +21,7 @@ def train_step_test_step_er(config):
 def main():
     conf = Config()
     conf.task_name = const.ERROR_RECOGNITION
+
     if conf.model_name is None:
         m_name = fetch_model_name(conf)
         conf.model_name = m_name
@@ -26,6 +29,7 @@ def main():
     if conf.enable_wandb:
         init_logger_and_wandb(conf)
 
+    # The dataset is already step → sequence of sub-steps.
     train_step_test_step_er(conf)
 
     if conf.enable_wandb:

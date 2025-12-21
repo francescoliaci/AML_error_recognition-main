@@ -116,23 +116,45 @@ class PositionalEncodingLearn(nn.Module):
         embed = self.embed(r)  # seq_len, embedding_dim
         return x + embed.repeat(x.shape[0], 1, 1)
 
-# ! ADDED NEW LSTM BASELINE 
+# ! ADDED NEW BASELINE v3
 class LSTMBaseline(nn.Module):
-    def __init__(self, input_size, hidden_size):
-        super().__init__()
+    def __init__(self, input_size: int, hidden_size: int, num_layers: int = 1, dropout: float = 0.1):
+        super(LSTMBaseline, self).__init__()
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
 
         self.lstm = nn.LSTM(
             input_size=input_size,
             hidden_size=hidden_size,
-            batch_first=True
+            num_layers=num_layers,
+            batch_first=True,
+            dropout=dropout if num_layers > 1 else 0.0,
         )
-
+        self.dropout = nn.Dropout(dropout)
         self.fc = nn.Linear(hidden_size, 1)
 
-    def forward(self, x):
-        if x.dim() == 2:
-            x = x.unsqueeze(1)  # (B, 1, D)
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Expected shapes:
+        - Step-level usage (your case):
+          x: (T, D)  -> one step, T sub-steps, D-dim features
+        - Batched usage:
+          x: (B, T, D)
 
-        _, (h_n, _) = self.lstm(x)
-        last_h = h_n[-1]
-        return self.fc(last_h).squeeze(-1)
+        We always interpret the **second** dimension as time.
+        """
+        if x.dim() == 2:
+            # (T, D) -> (1, T, D)
+            x = x.unsqueeze(0)
+        elif x.dim() == 3:
+            # (B, T, D) -> OK
+            pass
+        else:
+            raise ValueError(f"Unexpected input shape for LSTMBaseline: {x.shape}")
+
+        lstm_out, (h_n, c_n) = self.lstm(x)
+        # h_n: (num_layers, B, hidden_size) -> take last layer
+        last_hidden = h_n[-1]          # (B, hidden_size)
+        logits = self.fc(self.dropout(last_hidden)).squeeze(-1)  # (B,)
+
+        return logits
